@@ -2,7 +2,7 @@ name: Update README with Dublin weather
 
 on:
   schedule:
-    - cron: "10 9 * * *" # daily 09:10 UTC
+    - cron: "0 8 * * *" # daily 09:10 UTC
   workflow_dispatch: {}
 
 permissions:
