@@ -2,11 +2,9 @@ name: Update README with Dublin weather
 
 on:
   schedule:
-    - cron: "0 8 * * *" # daily 09:10 UTC
-  workflow_dispatch: {}
-
-permissions:
-  contents: write
+    # Runs daily at 08:10 UTC 
+    - cron: "10 8 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: dublin-weather-readme
@@ -15,23 +13,38 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
+          # Ensures we’re on the branch this workflow is running for
+          ref: ${{ github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
+      # - name: Install dependencies
+      #   run: |
+      #     python -m pip install --upgrade pip
+      #     pip install -r .github/scripts/requirements.txt
+
       - name: Update README
         run: |
           python .github/scripts/update_readme_weather.py
 
       - name: Commit & push (if changed)
+        env:
+          BRANCH: ${{ github.ref_name }}
         run: |
+          set -e
+
           git config user.name "dublin-weather-bot"
           git config user.email "dublin-weather-bot@users.noreply.github.com"
 
@@ -42,4 +55,9 @@ jobs:
           fi
 
           git commit -m "chore(readme): update Dublin weather"
-          git push
+
+          # Avoid non-fast-forward if something else updated the branch
+          git pull --rebase origin "$BRANCH"
+
+          # Push explicitly to the branch
+          git push origin HEAD:"$BRANCH"
