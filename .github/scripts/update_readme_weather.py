@@ -31,7 +31,6 @@ def http_get(url: str, timeout: int = 8, retries: int = 2, backoff_sec: float = 
 
 
 def weather_from_wttr() -> str:
-    # compact: "Dublin: 🌦 +8°C"
     txt = http_get("https://wttr.in/Dublin?format=3", timeout=6, retries=2).strip()
     if not txt:
         raise RuntimeError("wttr returned empty response")
@@ -89,7 +88,6 @@ def escape_svg_text(s: str) -> str:
 
 def classify_weather(weather_text: str) -> str:
     t = weather_text.lower()
-
     if any(k in t for k in ["thunder", "storm"]):
         return "thunder"
     if any(k in t for k in ["snow", "sleet", "blizzard"]):
@@ -107,9 +105,8 @@ def classify_weather(weather_text: str) -> str:
 
 def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     """
-    Animated SVG banner (CSS-based). Note: GitHub's README renderer may not
-    animate SVG consistently everywhere; it will still display as a static banner
-    if animation is blocked.
+    More "full-banner" continuous animations using tiled patterns that scroll
+    across the entire banner. If GitHub blocks animation, it still renders nicely.
     """
     bg = {
         "clear":   ("#0b1020", "#1b3a7a"),
@@ -122,52 +119,86 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     }
     c1, c2 = bg.get(theme, bg["cloud"])
 
+    # CSS: continuous scrolling layers across full banner
     css = """
   <style>
     .title { font: 44px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #fff; }
     .sub   { font: 24px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #dbeafe; opacity: .95; }
     .card  { fill: rgba(0,0,0,0.28); }
 
-    /* Animations (GitHub may or may not run these; static fallback still looks good) */
-    @keyframes rainFall { from { transform: translateY(-70px); } to { transform: translateY(80px); } }
-    @keyframes windMove { from { transform: translateX(-90px); } to { transform: translateX(90px); } }
-    @keyframes fogSlide { from { transform: translateX(-140px); } to { transform: translateX(140px); } }
-    @keyframes snowDrift{ from { transform: translate(0,-30px); } to { transform: translate(50px,45px); } }
-    @keyframes flash    { 0%,92%,100% { opacity: 0; } 93%,96% { opacity: .65; } 97% { opacity: .12; } }
+    /* Smooth infinite motion across entire banner */
+    @keyframes scrollDown { from { transform: translateY(-320px); } to { transform: translateY(0px); } }
+    @keyframes scrollRight{ from { transform: translateX(-600px); } to { transform: translateX(0px); } }
+    @keyframes scrollLeft { from { transform: translateX(0px); } to { transform: translateX(-600px); } }
+    @keyframes driftDiag  { from { transform: translate(-180px,-140px); } to { transform: translate(180px,140px); } }
 
-    .rain { animation: rainFall 1.1s linear infinite; }
-    .wind { animation: windMove 2.6s ease-in-out infinite alternate; }
-    .fog  { animation: fogSlide 7.5s ease-in-out infinite alternate; }
-    .snow { animation: snowDrift 3.8s linear infinite; }
-    .flash{ animation: flash 4.8s infinite; }
+    /* Thunder flash */
+    @keyframes flash { 0%,90%,100% { opacity: 0; } 91%,93% { opacity: .65; } 94% { opacity: .1; } 95% { opacity: .45; } }
+
+    .layerSlow  { opacity: .22; }
+    .layerMed   { opacity: .30; }
+    .layerFast  { opacity: .40; }
+
+    .rainSlow { animation: scrollDown 2.6s linear infinite; }
+    .rainMed  { animation: scrollDown 1.7s linear infinite; }
+    .rainFast { animation: scrollDown 1.1s linear infinite; }
+
+    .windSlow { animation: scrollRight 7.2s linear infinite; }
+    .windMed  { animation: scrollRight 4.8s linear infinite; }
+    .windFast { animation: scrollRight 3.2s linear infinite; }
+
+    .fogSlow  { animation: scrollLeft 18s ease-in-out infinite; }
+    .fogMed   { animation: scrollLeft 12s ease-in-out infinite; }
+    .fogFast  { animation: scrollLeft 8s  ease-in-out infinite; }
+
+    .snowSlow { animation: driftDiag 10s linear infinite; }
+    .snowMed  { animation: driftDiag 7s  linear infinite; }
+    .snowFast { animation: driftDiag 5s  linear infinite; }
+
+    .flash { animation: flash 4.8s infinite; }
   </style>
 """
 
-    # Prebuild decorative geometry
-    rain_lines = "\n".join(
-        f'<line x1="{x}" y1="{y}" x2="{x-6}" y2="{y+18}" stroke="#bcd6ff" stroke-width="2" />'
-        for x in range(40, 1200, 70)
-        for y in range(40, 320, 90)
-    )
+    # Helper: build a tiled group by repeating shapes
+    def rain_tile(x_offset: int, y_offset: int, step_x: int, step_y: int, count_x: int, count_y: int) -> str:
+        lines = []
+        for ix in range(count_x):
+            for iy in range(count_y):
+                x = x_offset + ix * step_x
+                y = y_offset + iy * step_y
+                lines.append(
+                    f'<line x1="{x}" y1="{y}" x2="{x-8}" y2="{y+22}" stroke="#bcd6ff" stroke-width="2" />'
+                )
+        return "\n".join(lines)
+
+    def snow_tile(count: int, seed_x: int, seed_y: int) -> str:
+        # deterministic "random-ish" scatter
+        circles = []
+        x = seed_x
+        y = seed_y
+        for i in range(count):
+            x = (x * 73 + 41) % 1200
+            y = (y * 91 + 19) % 320
+            r = 1 + ((x + y + i) % 3)
+            circles.append(f'<circle cx="{x}" cy="{y}" r="{r}" />')
+        return "\n".join(circles)
+
+    # Patterns: repeat wider than banner so translation looks continuous
+    rain1 = rain_tile(30, 10, 75, 95, 20, 6)
+    rain2 = rain_tile(60, 40, 85, 90, 18, 6)
+    rain3 = rain_tile(10, 20, 65, 100, 22, 6)
 
     wind_paths = """
-    <path d="M 60 90 C 140 65, 200 115, 280 90" />
-    <path d="M 120 160 C 200 135, 260 185, 340 160" />
-    <path d="M 40 230 C 140 205, 220 255, 320 230" />
-    <path d="M 180 260 C 280 235, 360 285, 480 260" />
+    <path d="M 60 90 C 180 40, 300 140, 420 90 S 660 140, 780 90 S 1020 140, 1140 90" />
+    <path d="M 20 170 C 160 120, 280 220, 420 170 S 680 220, 820 170 S 1080 220, 1220 170" />
+    <path d="M 80 250 C 220 200, 340 300, 480 250 S 740 300, 880 250 S 1140 300, 1280 250" />
 """
 
     fog_bands = """
-    <path d="M 70 110 H 1130" />
-    <path d="M 120 170 H 1080" />
-    <path d="M 90 230 H 1110" />
+    <path d="M -200 110 H 1400" />
+    <path d="M -260 170 H 1360" />
+    <path d="M -220 230 H 1380" />
 """
-
-    snow_flakes = "\n".join(
-        f'<circle cx="{x}" cy="{y}" r="{r}" />'
-        for x, y, r in [(90,80,3),(180,140,2),(260,70,2),(380,190,3),(520,110,2),
-                        (660,80,3),(780,170,2),(920,120,3),(1040,200,2),(1140,90,3)]
-    )
 
     clouds = """
     <ellipse cx="260" cy="150" rx="140" ry="70"/>
@@ -176,16 +207,34 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     <ellipse cx="1080" cy="160" rx="130" ry="65"/>
 """
 
-    # Choose overlay
+    sun = '<g opacity="0.35" fill="#ffd36a"><circle cx="1030" cy="120" r="55"/></g>'
+
+    # Build animated overlay layers
     overlay = ""
     if theme == "rain":
-        overlay = f'<g class="rain" opacity="0.35">{rain_lines}</g>'
+        overlay = f"""
+  <g class="layerSlow rainSlow">{rain1}</g>
+  <g class="layerMed rainMed">{rain2}</g>
+  <g class="layerFast rainFast">{rain3}</g>
+"""
     elif theme == "wind":
-        overlay = f'<g class="wind" opacity="0.35" fill="none" stroke="#bff3ff" stroke-width="3" stroke-linecap="round">{wind_paths}</g>'
+        overlay = f"""
+  <g class="layerSlow windSlow" fill="none" stroke="#bff3ff" stroke-width="3" stroke-linecap="round">{wind_paths}</g>
+  <g class="layerMed windMed"  fill="none" stroke="#bff3ff" stroke-width="2.5" stroke-linecap="round">{wind_paths}</g>
+  <g class="layerFast windFast" fill="none" stroke="#bff3ff" stroke-width="2" stroke-linecap="round">{wind_paths}</g>
+"""
     elif theme == "fog":
-        overlay = f'<g class="fog" opacity="0.35" fill="none" stroke="#dbeafe" stroke-width="10" stroke-linecap="round">{fog_bands}</g>'
+        overlay = f"""
+  <g class="layerSlow fogSlow" fill="none" stroke="#dbeafe" stroke-width="14" stroke-linecap="round">{fog_bands}</g>
+  <g class="layerMed fogMed"   fill="none" stroke="#dbeafe" stroke-width="10" stroke-linecap="round">{fog_bands}</g>
+  <g class="layerFast fogFast" fill="none" stroke="#dbeafe" stroke-width="8"  stroke-linecap="round">{fog_bands}</g>
+"""
     elif theme == "snow":
-        overlay = f'<g class="snow" opacity="0.45" fill="#eaf2ff">{snow_flakes}</g>'
+        overlay = f"""
+  <g class="layerSlow snowSlow" fill="#eaf2ff">{snow_tile(160, 17, 23)}</g>
+  <g class="layerMed snowMed"   fill="#eaf2ff">{snow_tile(140, 29, 31)}</g>
+  <g class="layerFast snowFast" fill="#eaf2ff">{snow_tile(120, 41, 37)}</g>
+"""
     elif theme == "thunder":
         overlay = """
   <g class="flash">
@@ -196,7 +245,7 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
   </g>
 """
     elif theme == "clear":
-        overlay = '<g opacity="0.35" fill="#ffd36a"><circle cx="1030" cy="120" r="55"/></g>'
+        overlay = sun
     else:  # cloud
         overlay = f'<g opacity="0.35" fill="#e2e8f0">{clouds}</g>'
 
@@ -243,7 +292,6 @@ def build_new_block(existing_block: str, banner_line: str, new_line: str, now_da
     for line in existing_block.splitlines():
         line = line.rstrip()
 
-        # Drop any previous banner line; we'll always re-add it at top.
         if line.strip() == banner_line.strip():
             continue
 
