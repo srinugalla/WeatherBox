@@ -31,7 +31,7 @@ jobs:
           python-version: "3.12"
 
       - name: Update README
-        run: python3 update_readme_weather.py
+        run: python3 .github/scripts/workflows/update_readme_weather.py
 
       - name: Commit and push if changed
         run: |
