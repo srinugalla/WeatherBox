@@ -12,7 +12,7 @@ END = "<!-- DUBLIN_WEATHER:END -->"
 KEEP_DAYS = 10
 
 # Matches:
-# - 2026-02-24 09:00 UTC — Dublin: 🌦 +8°C
+# - 2026-02-24 09:00 UTC — Dublin: 🌦 +8°C | Wind ↗15 km/h
 LINE_RE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) UTC — (.*)$")
 
 
@@ -31,7 +31,10 @@ def http_get(url: str, timeout: int = 8, retries: int = 2, backoff_sec: float = 
 
 
 def weather_from_wttr() -> str:
-    txt = http_get("https://wttr.in/Dublin?format=3", timeout=6, retries=2).strip()
+    # Include wind so we can reliably detect "windy" and show wind theme when appropriate.
+    # %l location, %c icon, %t temperature, %w wind
+    url = "https://wttr.in/Dublin?format=%l:+%c+%t+|+Wind+%w"
+    txt = http_get(url, timeout=6, retries=2).strip()
     if not txt:
         raise RuntimeError("wttr returned empty response")
     return txt
@@ -86,8 +89,25 @@ def escape_svg_text(s: str) -> str:
              .replace("'", "&#39;"))
 
 
+def extract_wind_kmh(weather_text: str) -> float | None:
+    """
+    Attempts to extract wind speed in km/h from strings like:
+    - "... | Wind ↗15 km/h"
+    - "... | Wind 22 km/h"
+    """
+    m = re.search(r"\bwind\b[^0-9]*([0-9]{1,3}(?:\.[0-9]+)?)\s*km/?h", weather_text, flags=re.IGNORECASE)
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return None
+
+
 def classify_weather(weather_text: str) -> str:
     t = weather_text.lower()
+
+    # Strong signals first
     if any(k in t for k in ["thunder", "storm"]):
         return "thunder"
     if any(k in t for k in ["snow", "sleet", "blizzard"]):
@@ -96,17 +116,31 @@ def classify_weather(weather_text: str) -> str:
         return "rain"
     if any(k in t for k in ["fog", "mist", "haze"]):
         return "fog"
-    if "wind" in t:
+
+    # Wind theme only when it is actually windy
+    w = extract_wind_kmh(weather_text)
+    if w is not None and w >= 25:  # threshold (km/h)
         return "wind"
+    if any(k in t for k in ["wind", "breez", "gust"]):
+        # fallback: if text explicitly says windy/breezy/gusty
+        return "wind"
+
     if any(k in t for k in ["overcast", "cloud"]):
         return "cloud"
+
     return "clear"
 
 
-def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
+def is_night_utc(now_utc: dt.datetime) -> bool:
+    # Simple day/night split (good enough for a badge in the banner).
+    # Dublin roughly: night outside 06:00–18:00 UTC.
+    h = now_utc.hour
+    return h < 6 or h >= 18
+
+
+def write_weather_svg(path: str, theme: str, title: str, subtitle: str, now_utc: dt.datetime) -> None:
     """
-    More "full-banner" continuous animations using tiled patterns that scroll
-    across the entire banner. If GitHub blocks animation, it still renders nicely.
+    Full-banner continuous animations + a top-right circular badge showing sun/moon.
     """
     bg = {
         "clear":   ("#0b1020", "#1b3a7a"),
@@ -119,20 +153,16 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     }
     c1, c2 = bg.get(theme, bg["cloud"])
 
-    # CSS: continuous scrolling layers across full banner
     css = """
   <style>
     .title { font: 44px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #fff; }
     .sub   { font: 24px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #dbeafe; opacity: .95; }
     .card  { fill: rgba(0,0,0,0.28); }
 
-    /* Smooth infinite motion across entire banner */
     @keyframes scrollDown { from { transform: translateY(-320px); } to { transform: translateY(0px); } }
     @keyframes scrollRight{ from { transform: translateX(-600px); } to { transform: translateX(0px); } }
     @keyframes scrollLeft { from { transform: translateX(0px); } to { transform: translateX(-600px); } }
     @keyframes driftDiag  { from { transform: translate(-180px,-140px); } to { transform: translate(180px,140px); } }
-
-    /* Thunder flash */
     @keyframes flash { 0%,90%,100% { opacity: 0; } 91%,93% { opacity: .65; } 94% { opacity: .1; } 95% { opacity: .45; } }
 
     .layerSlow  { opacity: .22; }
@@ -156,10 +186,13 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     .snowFast { animation: driftDiag 5s  linear infinite; }
 
     .flash { animation: flash 4.8s infinite; }
+
+    /* Badge subtle float */
+    @keyframes bob { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(3px); } }
+    .badge { animation: bob 2.8s ease-in-out infinite; }
   </style>
 """
 
-    # Helper: build a tiled group by repeating shapes
     def rain_tile(x_offset: int, y_offset: int, step_x: int, step_y: int, count_x: int, count_y: int) -> str:
         lines = []
         for ix in range(count_x):
@@ -172,7 +205,6 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
         return "\n".join(lines)
 
     def snow_tile(count: int, seed_x: int, seed_y: int) -> str:
-        # deterministic "random-ish" scatter
         circles = []
         x = seed_x
         y = seed_y
@@ -183,7 +215,6 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
             circles.append(f'<circle cx="{x}" cy="{y}" r="{r}" />')
         return "\n".join(circles)
 
-    # Patterns: repeat wider than banner so translation looks continuous
     rain1 = rain_tile(30, 10, 75, 95, 20, 6)
     rain2 = rain_tile(60, 40, 85, 90, 18, 6)
     rain3 = rain_tile(10, 20, 65, 100, 22, 6)
@@ -207,9 +238,7 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     <ellipse cx="1080" cy="160" rx="130" ry="65"/>
 """
 
-    sun = '<g opacity="0.35" fill="#ffd36a"><circle cx="1030" cy="120" r="55"/></g>'
-
-    # Build animated overlay layers
+    # Weather overlay
     overlay = ""
     if theme == "rain":
         overlay = f"""
@@ -244,10 +273,45 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     <polygon points="620,70 560,190 635,190 590,310 705,165 635,165" fill="#f7d34a"/>
   </g>
 """
-    elif theme == "clear":
-        overlay = sun
-    else:  # cloud
+    elif theme == "cloud":
         overlay = f'<g opacity="0.35" fill="#e2e8f0">{clouds}</g>'
+    else:
+        overlay = ""  # clear handled by badge + background
+
+    # Sun/Moon badge (top-right circle)
+    night = is_night_utc(now_utc)
+    # badge base
+    badge_base = """
+  <g class="badge">
+    <circle cx="1125" cy="85" r="38" fill="rgba(0,0,0,0.28)"/>
+    <circle cx="1125" cy="85" r="36" fill="rgba(255,255,255,0.06)"/>
+  </g>
+"""
+    # sun icon
+    sun_icon = """
+  <g class="badge">
+    <circle cx="1125" cy="85" r="14" fill="#ffd36a"/>
+    <g stroke="#ffd36a" stroke-width="3" stroke-linecap="round" opacity="0.95">
+      <line x1="1125" y1="58" x2="1125" y2="68"/>
+      <line x1="1125" y1="102" x2="1125" y2="112"/>
+      <line x1="1098" y1="85" x2="1108" y2="85"/>
+      <line x1="1142" y1="85" x2="1152" y2="85"/>
+      <line x1="1107" y1="67" x2="1114" y2="74"/>
+      <line x1="1136" y1="96" x2="1143" y2="103"/>
+      <line x1="1136" y1="74" x2="1143" y2="67"/>
+      <line x1="1107" y1="103" x2="1114" y2="96"/>
+    </g>
+  </g>
+"""
+    # moon icon (crescent)
+    moon_icon = """
+  <g class="badge">
+    <circle cx="1125" cy="85" r="16" fill="#dbeafe"/>
+    <circle cx="1132" cy="80" r="16" fill="rgba(0,0,0,0.28)"/>
+  </g>
+"""
+
+    badge = badge_base + (moon_icon if night else sun_icon)
 
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320">
   <defs>
@@ -263,6 +327,8 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
 
   <rect width="1200" height="320" rx="22" fill="url(#g)"/>
   {overlay}
+
+  {badge}
 
   <g filter="url(#shadow)">
     <rect x="56" y="60" width="1088" height="200" rx="18" class="card"/>
@@ -339,6 +405,7 @@ def update_readme(readme_path: str) -> bool:
         theme=theme,
         title="Dublin Weather",
         subtitle=f"{weather} • Updated {now_stamp}",
+        now_utc=now_dt,
     )
 
     banner_line = '<img src="assets/dublin-weather.svg" width="100%" alt="Dublin weather banner" />'
