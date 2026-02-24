@@ -90,7 +90,6 @@ def escape_svg_text(s: str) -> str:
 def classify_weather(weather_text: str) -> str:
     t = weather_text.lower()
 
-    # Prioritize precipitation/thunder first
     if any(k in t for k in ["thunder", "storm"]):
         return "thunder"
     if any(k in t for k in ["snow", "sleet", "blizzard"]):
@@ -99,18 +98,19 @@ def classify_weather(weather_text: str) -> str:
         return "rain"
     if any(k in t for k in ["fog", "mist", "haze"]):
         return "fog"
-
-    # Wind: wttr/open-meteo lines often include "Wind ..."
     if "wind" in t:
         return "wind"
-
     if any(k in t for k in ["overcast", "cloud"]):
         return "cloud"
-
     return "clear"
 
 
 def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
+    """
+    Animated SVG banner (CSS-based). Note: GitHub's README renderer may not
+    animate SVG consistently everywhere; it will still display as a static banner
+    if animation is blocked.
+    """
     bg = {
         "clear":   ("#0b1020", "#1b3a7a"),
         "cloud":   ("#0f172a", "#334155"),
@@ -122,69 +122,83 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
     }
     c1, c2 = bg.get(theme, bg["cloud"])
 
-    patterns = {
-        "rain": """
-          <g opacity="0.35">
-            {drops}
-          </g>
-        """.format(
-            drops="\n".join(
-                f'<line x1="{x}" y1="{y}" x2="{x-6}" y2="{y+18}" stroke="#bcd6ff" stroke-width="2" />'
-                for x in range(40, 1200, 70)
-                for y in range(40, 320, 90)
-            )
-        ),
-        "wind": """
-          <g opacity="0.35" fill="none" stroke="#bff3ff" stroke-width="3" stroke-linecap="round">
-            <path d="M 60 90 C 140 65, 200 115, 280 90" />
-            <path d="M 120 160 C 200 135, 260 185, 340 160" />
-            <path d="M 40 230 C 140 205, 220 255, 320 230" />
-            <path d="M 180 260 C 280 235, 360 285, 480 260" />
-          </g>
-        """,
-        "snow": """
-          <g opacity="0.45" fill="#eaf2ff">
-            <circle cx="90" cy="80" r="3" />
-            <circle cx="180" cy="140" r="2" />
-            <circle cx="260" cy="70" r="2" />
-            <circle cx="380" cy="190" r="3" />
-            <circle cx="520" cy="110" r="2" />
-            <circle cx="660" cy="80" r="3" />
-            <circle cx="780" cy="170" r="2" />
-            <circle cx="920" cy="120" r="3" />
-            <circle cx="1040" cy="200" r="2" />
-            <circle cx="1140" cy="90" r="3" />
-          </g>
-        """,
-        "fog": """
-          <g opacity="0.35" fill="none" stroke="#dbeafe" stroke-width="10" stroke-linecap="round">
-            <path d="M 70 110 H 1130" />
-            <path d="M 120 170 H 1080" />
-            <path d="M 90 230 H 1110" />
-          </g>
-        """,
-        "thunder": """
-          <g opacity="0.45">
-            <polygon points="620,70 560,190 635,190 590,310 705,165 635,165"
-                     fill="#f7d34a"/>
-          </g>
-        """,
-        "cloud": """
-          <g opacity="0.35" fill="#e2e8f0">
-            <ellipse cx="260" cy="150" rx="140" ry="70"/>
-            <ellipse cx="360" cy="140" rx="120" ry="60"/>
-            <ellipse cx="980" cy="170" rx="160" ry="80"/>
-            <ellipse cx="1080" cy="160" rx="130" ry="65"/>
-          </g>
-        """,
-        "clear": """
-          <g opacity="0.35" fill="#ffd36a">
-            <circle cx="1030" cy="120" r="55"/>
-          </g>
-        """,
-    }
+    css = """
+  <style>
+    .title { font: 44px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #fff; }
+    .sub   { font: 24px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #dbeafe; opacity: .95; }
+    .card  { fill: rgba(0,0,0,0.28); }
 
-    deco = patterns.get(theme, patterns["cloud"])
+    /* Animations (GitHub may or may not run these; static fallback still looks good) */
+    @keyframes rainFall { from { transform: translateY(-70px); } to { transform: translateY(80px); } }
+    @keyframes windMove { from { transform: translateX(-90px); } to { transform: translateX(90px); } }
+    @keyframes fogSlide { from { transform: translateX(-140px); } to { transform: translateX(140px); } }
+    @keyframes snowDrift{ from { transform: translate(0,-30px); } to { transform: translate(50px,45px); } }
+    @keyframes flash    { 0%,92%,100% { opacity: 0; } 93%,96% { opacity: .65; } 97% { opacity: .12; } }
+
+    .rain { animation: rainFall 1.1s linear infinite; }
+    .wind { animation: windMove 2.6s ease-in-out infinite alternate; }
+    .fog  { animation: fogSlide 7.5s ease-in-out infinite alternate; }
+    .snow { animation: snowDrift 3.8s linear infinite; }
+    .flash{ animation: flash 4.8s infinite; }
+  </style>
+"""
+
+    # Prebuild decorative geometry
+    rain_lines = "\n".join(
+        f'<line x1="{x}" y1="{y}" x2="{x-6}" y2="{y+18}" stroke="#bcd6ff" stroke-width="2" />'
+        for x in range(40, 1200, 70)
+        for y in range(40, 320, 90)
+    )
+
+    wind_paths = """
+    <path d="M 60 90 C 140 65, 200 115, 280 90" />
+    <path d="M 120 160 C 200 135, 260 185, 340 160" />
+    <path d="M 40 230 C 140 205, 220 255, 320 230" />
+    <path d="M 180 260 C 280 235, 360 285, 480 260" />
+"""
+
+    fog_bands = """
+    <path d="M 70 110 H 1130" />
+    <path d="M 120 170 H 1080" />
+    <path d="M 90 230 H 1110" />
+"""
+
+    snow_flakes = "\n".join(
+        f'<circle cx="{x}" cy="{y}" r="{r}" />'
+        for x, y, r in [(90,80,3),(180,140,2),(260,70,2),(380,190,3),(520,110,2),
+                        (660,80,3),(780,170,2),(920,120,3),(1040,200,2),(1140,90,3)]
+    )
+
+    clouds = """
+    <ellipse cx="260" cy="150" rx="140" ry="70"/>
+    <ellipse cx="360" cy="140" rx="120" ry="60"/>
+    <ellipse cx="980" cy="170" rx="160" ry="80"/>
+    <ellipse cx="1080" cy="160" rx="130" ry="65"/>
+"""
+
+    # Choose overlay
+    overlay = ""
+    if theme == "rain":
+        overlay = f'<g class="rain" opacity="0.35">{rain_lines}</g>'
+    elif theme == "wind":
+        overlay = f'<g class="wind" opacity="0.35" fill="none" stroke="#bff3ff" stroke-width="3" stroke-linecap="round">{wind_paths}</g>'
+    elif theme == "fog":
+        overlay = f'<g class="fog" opacity="0.35" fill="none" stroke="#dbeafe" stroke-width="10" stroke-linecap="round">{fog_bands}</g>'
+    elif theme == "snow":
+        overlay = f'<g class="snow" opacity="0.45" fill="#eaf2ff">{snow_flakes}</g>'
+    elif theme == "thunder":
+        overlay = """
+  <g class="flash">
+    <rect width="1200" height="320" fill="#ffffff"/>
+  </g>
+  <g opacity="0.55">
+    <polygon points="620,70 560,190 635,190 590,310 705,165 635,165" fill="#f7d34a"/>
+  </g>
+"""
+    elif theme == "clear":
+        overlay = '<g opacity="0.35" fill="#ffd36a"><circle cx="1030" cy="120" r="55"/></g>'
+    else:  # cloud
+        overlay = f'<g opacity="0.35" fill="#e2e8f0">{clouds}</g>'
 
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320">
   <defs>
@@ -196,18 +210,15 @@ def write_weather_svg(path: str, theme: str, title: str, subtitle: str) -> None:
       <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
     </filter>
   </defs>
+{css}
 
   <rect width="1200" height="320" rx="22" fill="url(#g)"/>
-  {deco}
+  {overlay}
 
   <g filter="url(#shadow)">
-    <rect x="56" y="60" width="1088" height="200" rx="18" fill="rgba(0,0,0,0.28)"/>
-    <text x="96" y="135" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="44" fill="#ffffff">
-      {escape_svg_text(title)}
-    </text>
-    <text x="96" y="195" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="24" fill="#dbeafe" opacity="0.95">
-      {escape_svg_text(subtitle)}
-    </text>
+    <rect x="56" y="60" width="1088" height="200" rx="18" class="card"/>
+    <text x="96" y="135" class="title">{escape_svg_text(title)}</text>
+    <text x="96" y="195" class="sub">{escape_svg_text(subtitle)}</text>
   </g>
 </svg>
 """
@@ -247,20 +258,12 @@ def build_new_block(existing_block: str, banner_line: str, new_line: str, now_da
             kept_lines.append(line)
 
     header = f"### Dublin weather (last {KEEP_DAYS} days)"
-    # remove any duplicate headers
     kept_lines = [ln for ln in kept_lines if ln != header]
 
-    # Assemble block:
-    # banner
-    # header
-    # new entry
-    # older entries
     block_lines = [banner_line, "", header, new_line]
-    # Ensure we don't duplicate the same new line if rerun
     rest = [ln for ln in kept_lines if ln != new_line and ln.strip() != header]
     block_lines.extend(rest)
 
-    # Trim excessive blank lines
     out = "\n".join(block_lines).strip() + "\n"
     return out.strip()
 
@@ -282,7 +285,6 @@ def update_readme(readme_path: str) -> bool:
         entry = f"- {now_stamp} — {weather}"
         theme = "cloud"
 
-    # Write/update the banner SVG every run
     banner_path = os.path.join(os.getcwd(), "assets", "dublin-weather.svg")
     write_weather_svg(
         path=banner_path,
