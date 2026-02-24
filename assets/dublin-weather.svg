@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0b1020"/>
-      <stop offset="1" stop-color="#1b3a7a"/>
+      <stop offset="0" stop-color="#071018"/>
+      <stop offset="1" stop-color="#123a4a"/>
     </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
@@ -14,13 +14,10 @@
     .sub   { font: 24px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #dbeafe; opacity: .95; }
     .card  { fill: rgba(0,0,0,0.28); }
 
-    /* Smooth infinite motion across entire banner */
     @keyframes scrollDown { from { transform: translateY(-320px); } to { transform: translateY(0px); } }
     @keyframes scrollRight{ from { transform: translateX(-600px); } to { transform: translateX(0px); } }
     @keyframes scrollLeft { from { transform: translateX(0px); } to { transform: translateX(-600px); } }
     @keyframes driftDiag  { from { transform: translate(-180px,-140px); } to { transform: translate(180px,140px); } }
-
-    /* Thunder flash */
     @keyframes flash { 0%,90%,100% { opacity: 0; } 91%,93% { opacity: .65; } 94% { opacity: .1; } 95% { opacity: .45; } }
 
     .layerSlow  { opacity: .22; }
@@ -44,15 +41,56 @@
     .snowFast { animation: driftDiag 5s  linear infinite; }
 
     .flash { animation: flash 4.8s infinite; }
+
+    /* Badge subtle float */
+    @keyframes bob { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(3px); } }
+    .badge { animation: bob 2.8s ease-in-out infinite; }
   </style>
 
 
   <rect width="1200" height="320" rx="22" fill="url(#g)"/>
-  <g opacity="0.35" fill="#ffd36a"><circle cx="1030" cy="120" r="55"/></g>
+  
+  <g class="layerSlow windSlow" fill="none" stroke="#bff3ff" stroke-width="3" stroke-linecap="round">
+    <path d="M 60 90 C 180 40, 300 140, 420 90 S 660 140, 780 90 S 1020 140, 1140 90" />
+    <path d="M 20 170 C 160 120, 280 220, 420 170 S 680 220, 820 170 S 1080 220, 1220 170" />
+    <path d="M 80 250 C 220 200, 340 300, 480 250 S 740 300, 880 250 S 1140 300, 1280 250" />
+</g>
+  <g class="layerMed windMed"  fill="none" stroke="#bff3ff" stroke-width="2.5" stroke-linecap="round">
+    <path d="M 60 90 C 180 40, 300 140, 420 90 S 660 140, 780 90 S 1020 140, 1140 90" />
+    <path d="M 20 170 C 160 120, 280 220, 420 170 S 680 220, 820 170 S 1080 220, 1220 170" />
+    <path d="M 80 250 C 220 200, 340 300, 480 250 S 740 300, 880 250 S 1140 300, 1280 250" />
+</g>
+  <g class="layerFast windFast" fill="none" stroke="#bff3ff" stroke-width="2" stroke-linecap="round">
+    <path d="M 60 90 C 180 40, 300 140, 420 90 S 660 140, 780 90 S 1020 140, 1140 90" />
+    <path d="M 20 170 C 160 120, 280 220, 420 170 S 680 220, 820 170 S 1080 220, 1220 170" />
+    <path d="M 80 250 C 220 200, 340 300, 480 250 S 740 300, 880 250 S 1140 300, 1280 250" />
+</g>
+
+
+  
+  <g class="badge">
+    <circle cx="1125" cy="85" r="38" fill="rgba(0,0,0,0.28)"/>
+    <circle cx="1125" cy="85" r="36" fill="rgba(255,255,255,0.06)"/>
+  </g>
+
+  <g class="badge">
+    <circle cx="1125" cy="85" r="14" fill="#ffd36a"/>
+    <g stroke="#ffd36a" stroke-width="3" stroke-linecap="round" opacity="0.95">
+      <line x1="1125" y1="58" x2="1125" y2="68"/>
+      <line x1="1125" y1="102" x2="1125" y2="112"/>
+      <line x1="1098" y1="85" x2="1108" y2="85"/>
+      <line x1="1142" y1="85" x2="1152" y2="85"/>
+      <line x1="1107" y1="67" x2="1114" y2="74"/>
+      <line x1="1136" y1="96" x2="1143" y2="103"/>
+      <line x1="1136" y1="74" x2="1143" y2="67"/>
+      <line x1="1107" y1="103" x2="1114" y2="96"/>
+    </g>
+  </g>
+
 
   <g filter="url(#shadow)">
     <rect x="56" y="60" width="1088" height="200" rx="18" class="card"/>
     <text x="96" y="135" class="title">Dublin Weather</text>
-    <text x="96" y="195" class="sub">Dublin: ⛅️  +12°C • Updated 2026-02-24 15:16 UTC</text>
+    <text x="96" y="195" class="sub">Dublin: ⛅️  +12°C | Wind ↑18km/h • Updated 2026-02-24 15:24 UTC</text>
   </g>
 </svg>
