@@ -31,7 +31,7 @@ jobs:
           python-version: "3.12"
 
       - name: Update README
-        run: python3 update_weather.py
+        run: python3 update_readme_weather.py
 
       - name: Commit and push if changed
         run: |
@@ -43,7 +43,7 @@ jobs:
             exit 0
           fi
 
-          # Commit as YOU (email must be verified on GitHub for contributions)
+          # Commit by
           git config user.name "srinugalla"
           git config user.email "srinu.galla@gmail.com"
 
