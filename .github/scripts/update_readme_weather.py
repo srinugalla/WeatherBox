@@ -9,6 +9,13 @@ from urllib.request import Request, urlopen
 START = "<!-- DUBLIN_WEATHER:START -->"
 END = "<!-- DUBLIN_WEATHER:END -->"
 
+# Keep entries newer than this many days (rolling window)
+KEEP_DAYS = 10
+
+# Matches a single log line like:
+# - 2026-02-24 09:00 UTC — Dublin: 🌦 +8°C
+LINE_RE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) UTC — (.*)$")
+
 
 def http_get(url: str, timeout: int = 8, retries: int = 2, backoff_sec: float = 1.0) -> str:
     last_err = None
@@ -25,7 +32,6 @@ def http_get(url: str, timeout: int = 8, retries: int = 2, backoff_sec: float = 
 
 
 def weather_from_wttr() -> str:
-    # compact: "Dublin: 🌦 +8°C"
     txt = http_get("https://wttr.in/Dublin?format=3", timeout=6, retries=2).strip()
     if not txt:
         raise RuntimeError("wttr returned empty response")
@@ -33,7 +39,6 @@ def weather_from_wttr() -> str:
 
 
 def weather_from_open_meteo() -> str:
-    # Dublin approx coords
     url = (
         "https://api.open-meteo.com/v1/forecast"
         "?latitude=53.3498&longitude=-6.2603"
@@ -47,7 +52,6 @@ def weather_from_open_meteo() -> str:
     wind = cur.get("wind_speed_10m")
     code = cur.get("weather_code")
 
-    # minimal code mapping (enough for a nice README line)
     code_map = {
         0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
         45: "Fog", 48: "Rime fog",
@@ -69,28 +73,71 @@ def weather_from_open_meteo() -> str:
 
 
 def fetch_weather() -> str:
-    # Try provider A, then provider B
     try:
         return weather_from_wttr()
     except Exception:
         return weather_from_open_meteo()
 
 
-def update_readme(readme_path: str) -> None:
+def extract_block(readme: str) -> str:
+    if START not in readme or END not in readme:
+        raise SystemExit("Weather markers not found in README.md")
+    m = re.search(rf"{re.escape(START)}\n(.*)\n{re.escape(END)}", readme, flags=re.DOTALL)
+    if not m:
+        return ""
+    return m.group(1).strip()
+
+
+def build_new_block(existing_block: str, new_line: str, now_date: dt.date) -> str:
+    # Parse existing lines, keep only those within KEEP_DAYS window
+    kept_lines = []
+    cutoff = now_date - dt.timedelta(days=KEEP_DAYS - 1)  # inclusive rolling window
+
+    for line in existing_block.splitlines():
+        line = line.rstrip()
+        mm = LINE_RE.match(line)
+        if not mm:
+            # keep non-log lines (like headers) as-is
+            if line.strip():
+                kept_lines.append(line)
+            continue
+
+        d = dt.date.fromisoformat(mm.group(1))
+        if d >= cutoff:
+            kept_lines.append(line)
+
+    # Ensure a header line
+    header = "### Dublin weather (last 10 days)"
+    if not kept_lines or kept_lines[0] != header:
+        # remove any duplicate header occurrences
+        kept_lines = [ln for ln in kept_lines if ln != header]
+        kept_lines.insert(0, header)
+
+  
+    # Also ensures we don't duplicate if workflow re-runs quickly with same timestamp
+    if len(kept_lines) >= 2 and kept_lines[1] == new_line:
+        return "\n".join(kept_lines)
+
+    kept_lines.insert(1, new_line)
+    return "\n".join(kept_lines).strip()
+
+
+def update_readme(readme_path: str) -> bool:
     with open(readme_path, "r", encoding="utf-8") as f:
         original = f.read()
 
-    if START not in original or END not in original:
-        raise SystemExit("Weather markers not found in README.md")
-
-    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now_dt = dt.datetime.now(dt.timezone.utc)
+    now_stamp = now_dt.strftime("%Y-%m-%d %H:%M UTC")
+    now_date = now_dt.date()
 
     try:
         weather = fetch_weather()
-        new_block = f"**{weather}**\n\n_Last updated: {now}_"
-    except Exception as e:
-        # Do NOT fail the workflow; write a useful message and still commit
-        new_block = f"⚠️ Weather fetch unavailable.\n\n_Last attempt: {now}_"
+        entry = f"- {now_stamp} — {weather}"
+    except Exception:
+        entry = f"- {now_stamp} — ⚠️ Weather fetch unavailable."
+
+    existing_block = extract_block(original)
+    new_block = build_new_block(existing_block, entry, now_date)
 
     pattern = re.compile(rf"{re.escape(START)}.*?{re.escape(END)}", flags=re.DOTALL)
     replacement = f"{START}\n{new_block}\n{END}"
@@ -98,12 +145,13 @@ def update_readme(readme_path: str) -> None:
 
     if updated == original:
         print("No changes needed.")
-        return
+        return False
 
     with open(readme_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(updated)
 
     print("README.md updated.")
+    return True
 
 
 def main() -> None:
@@ -111,7 +159,10 @@ def main() -> None:
     if not os.path.exists(readme_path):
         raise SystemExit("README.md not found in repo root")
 
-    update_readme(readme_path)
+    changed = update_readme(readme_path)
+    # Exit success regardless; commit step decides based on git diff
+    if not changed:
+        print("Nothing changed.")
 
 
 if __name__ == "__main__":
