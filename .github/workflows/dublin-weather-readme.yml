@@ -1,79 +1,42 @@
-name: Update README with Dublin weather
+name: Update Dublin Weather
 
 on:
-  push:
-    branches:
-      - main
-    # Optional: only run when these paths change (remove if you want every push)
-    paths:
-      - "README.md"
-      - ".github/scripts/**"
-      - ".github/workflows/**"
   schedule:
-    # Daily at 08:10 UTC
-    - cron: "10 8 * * *"
+    # Twice daily (UTC).
+    - cron: "0 7 * * *"
+    - cron: "0 19 * * *"
   workflow_dispatch:
 
-concurrency:
-  group: dublin-weather-readme
-  cancel-in-progress: false
+permissions:
+  contents: write
 
 jobs:
-  update:
+  update-readme:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: true
-          ref: ${{ github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Debug - show branch and files
-        run: |
-          echo "Branch: ${{ github.ref_name }}"
-          ls -la
-          echo "---- README (first 40 lines) ----"
-          sed -n '1,40p' README.md || true
-
       - name: Update README
+        run: python3 update_weather.py
+
+      - name: Commit and push if changed
         run: |
-          python .github/scripts/update_readme_weather.py
-
-      - name: Debug - show git changes after script
-        run: |
-          echo "---- git status ----"
-          git status --porcelain=v1
-          echo "---- diff (README) ----"
-          git diff -- README.md || true
-
-      - name: Commit & push (if changed)
-        env:
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          set -e
-
-          git config user.name "dublin-weather-bot"
-          git config user.email "dublin-weather-bot@users.noreply.github.com"
-
-          git add README.md
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit (README.md unchanged)."
+          git status
+          if git diff --quiet; then
+            echo "No changes to commit."
             exit 0
           fi
 
-          git commit -m "chore(readme): update Dublin weather"
+          
+          git config user.name "srinugalla"
+          git config user.email "srinu.galla@gmail.com"
 
-          # Avoid non-fast-forward if branch moved
-          git pull --rebase origin "$BRANCH"
-
-          git push origin HEAD:"$BRANCH"
+          git add README.md
+          git commit -m "Update Dublin weather"
+          git push
