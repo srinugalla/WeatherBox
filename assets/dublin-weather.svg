@@ -9,23 +9,37 @@
     </filter>
   </defs>
 
+  <style>
+    .title { font: 44px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #fff; }
+    .sub   { font: 24px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #dbeafe; opacity: .95; }
+    .card  { fill: rgba(0,0,0,0.28); }
+
+    /* Animations (GitHub may or may not run these; static fallback still looks good) */
+    @keyframes rainFall { from { transform: translateY(-70px); } to { transform: translateY(80px); } }
+    @keyframes windMove { from { transform: translateX(-90px); } to { transform: translateX(90px); } }
+    @keyframes fogSlide { from { transform: translateX(-140px); } to { transform: translateX(140px); } }
+    @keyframes snowDrift{ from { transform: translate(0,-30px); } to { transform: translate(50px,45px); } }
+    @keyframes flash    { 0%,92%,100% { opacity: 0; } 93%,96% { opacity: .65; } 97% { opacity: .12; } }
+
+    .rain { animation: rainFall 1.1s linear infinite; }
+    .wind { animation: windMove 2.6s ease-in-out infinite alternate; }
+    .fog  { animation: fogSlide 7.5s ease-in-out infinite alternate; }
+    .snow { animation: snowDrift 3.8s linear infinite; }
+    .flash{ animation: flash 4.8s infinite; }
+  </style>
+
+
   <rect width="1200" height="320" rx="22" fill="url(#g)"/>
-  
-          <g opacity="0.35" fill="none" stroke="#bff3ff" stroke-width="3" stroke-linecap="round">
-            <path d="M 60 90 C 140 65, 200 115, 280 90" />
-            <path d="M 120 160 C 200 135, 260 185, 340 160" />
-            <path d="M 40 230 C 140 205, 220 255, 320 230" />
-            <path d="M 180 260 C 280 235, 360 285, 480 260" />
-          </g>
-        
+  <g class="wind" opacity="0.35" fill="none" stroke="#bff3ff" stroke-width="3" stroke-linecap="round">
+    <path d="M 60 90 C 140 65, 200 115, 280 90" />
+    <path d="M 120 160 C 200 135, 260 185, 340 160" />
+    <path d="M 40 230 C 140 205, 220 255, 320 230" />
+    <path d="M 180 260 C 280 235, 360 285, 480 260" />
+</g>
 
   <g filter="url(#shadow)">
-    <rect x="56" y="60" width="1088" height="200" rx="18" fill="rgba(0,0,0,0.28)"/>
-    <text x="96" y="135" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="44" fill="#ffffff">
-      Dublin Weather
-    </text>
-    <text x="96" y="195" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="24" fill="#dbeafe" opacity="0.95">
-      Dublin: Overcast, 12.4°C | Wind 19.8 km/h • Updated 2026-02-24 14:52 UTC
-    </text>
+    <rect x="56" y="60" width="1088" height="200" rx="18" class="card"/>
+    <text x="96" y="135" class="title">Dublin Weather</text>
+    <text x="96" y="195" class="sub">Dublin: Overcast, 12.5°C | Wind 20.2 km/h • Updated 2026-02-24 15:09 UTC</text>
   </g>
 </svg>
