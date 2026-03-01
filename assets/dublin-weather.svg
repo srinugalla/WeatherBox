@@ -74,23 +74,14 @@
   </g>
 
   <g class="badge">
-    <circle cx="1125" cy="85" r="14" fill="#ffd36a"/>
-    <g stroke="#ffd36a" stroke-width="3" stroke-linecap="round" opacity="0.95">
-      <line x1="1125" y1="58" x2="1125" y2="68"/>
-      <line x1="1125" y1="102" x2="1125" y2="112"/>
-      <line x1="1098" y1="85" x2="1108" y2="85"/>
-      <line x1="1142" y1="85" x2="1152" y2="85"/>
-      <line x1="1107" y1="67" x2="1114" y2="74"/>
-      <line x1="1136" y1="96" x2="1143" y2="103"/>
-      <line x1="1136" y1="74" x2="1143" y2="67"/>
-      <line x1="1107" y1="103" x2="1114" y2="96"/>
-    </g>
+    <circle cx="1125" cy="85" r="16" fill="#dbeafe"/>
+    <circle cx="1132" cy="80" r="16" fill="rgba(0,0,0,0.28)"/>
   </g>
 
 
   <g filter="url(#shadow)">
     <rect x="56" y="60" width="1088" height="200" rx="18" class="card"/>
     <text x="96" y="135" class="title">Dublin Weather</text>
-    <text x="96" y="195" class="sub">Dublin: Overcast, 10.3°C | Wind 17.6 km/h • Updated 2026-03-01 07:33 UTC</text>
+    <text x="96" y="195" class="sub">Dublin: ⛅️  +12°C | Wind ↑26km/h • Updated 2026-03-01 19:17 UTC</text>
   </g>
 </svg>
