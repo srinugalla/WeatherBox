@@ -1,6 +1,4 @@
-# Github github actions
-
-## Dublin Weather (auto-updated daily)
+# Dublin Weather (auto-updated daily)
 
 <!-- DUBLIN_WEATHER:START -->
 <img src="assets/dublin-weather.svg" width="100%" alt="Dublin weather banner" />
