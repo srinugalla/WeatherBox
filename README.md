@@ -26,4 +26,4 @@
 - _Last updated: 2026-02-24 09:03 UTC_
 <!-- DUBLIN_WEATHER:END -->
 
-_Last updated by GitHub Actions._
+-_Last updated by GitHub Actions._
