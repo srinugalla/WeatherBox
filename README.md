@@ -23,3 +23,7 @@
 - 2026-03-15 07:46 UTC — Dublin: 🌦   +9°C | Wind ↗23km/h
 - 2026-03-14 19:21 UTC — Dublin: ⛅️  +45°F | Wind →6mph
 - 2026-03-14 07:36 UTC — Dublin: ⛅️  +3°C | Wind ↗12km/h
+- _Last updated: 2026-02-24 09:03 UTC_
+<!-- DUBLIN_WEATHER:END -->
+
+_Last updated by GitHub Actions._
