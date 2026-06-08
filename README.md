@@ -4,6 +4,7 @@
 <img src="assets/dublin-weather.svg" width="100%" alt="Dublin weather banner" />
 
 ### Dublin weather (last 10 days)
+- 2026-06-08 21:09 UTC — Dublin: 🌤️  +56°F | Wind ↗11mph
 - 2026-06-08 11:58 UTC — Dublin: 🌤️  +58°F | Wind →12mph
 - 2026-06-07 20:07 UTC — Dublin: 🌦️  +58°F | Wind ↑8mph
 - 2026-06-07 10:05 UTC — Dublin: ☁️  +57°F | Wind ↗11mph
